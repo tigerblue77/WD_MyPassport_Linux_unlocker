@@ -3,10 +3,12 @@
 # Adapted from wader/postfix-relay's file of the same name.
 #
 # Requirements, both set by hand, and in this order:
-# - a ruleset on main with required status checks. The one this expects is
-#   committed as .github/rulesets/main.json, in the form GitHub's "Import a
-#   ruleset" takes. Without it "gh pr merge --auto" has nothing to wait for
-#   and merges straight away, before CI has said anything.
+# - a ruleset on main with required status checks, and no required approval.
+#   The live one is recorded as .github/rulesets/main.json, as GitHub exports
+#   it and in the form its "Import a ruleset" takes. Without required checks
+#   "gh pr merge --auto" has nothing to wait for and merges straight away,
+#   before CI has said anything; with a required approval it waits for a
+#   person on every update, however green.
 # - "Allow auto-merge" enabled in the repository settings. Without it the
 #   step below fails and the pull request stays open, which is the safe way
 #   round -- and the reason the ruleset comes first.
@@ -51,14 +53,19 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # --merge : no pull request has been merged here yet to set a
-      # convention, and merge commits are what the settings allow by default
-      # and what wader/postfix-relay, the reference, uses.
+      # --squash, because the ruleset on main requires a linear history, and
+      # a merge commit is exactly what that rule refuses: --merge could never
+      # land an update, and every one would stay open. It is also what the
+      # maintainer's other repositories do under the same rule
+      # (Dell_iDRAC_fan_controller_Docker, Claude-Code-Docker-container), so
+      # every one of them lands Dependabot's updates the same way. --rebase
+      # would satisfy the rule as well, and make this the one repository that
+      # does it differently.
       - name: Enable auto-merge for minor and patch updates
         if: >-
           steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
           steps.metadata.outputs.update-type == 'version-update:semver-patch'
-        run: gh pr merge --auto --merge "$PR_URL"
+        run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           # GITHUB_TOKEN is enough. A merge made with it starts no workflow,
