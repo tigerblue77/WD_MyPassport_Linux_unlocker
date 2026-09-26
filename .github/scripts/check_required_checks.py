@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Fail when .github/rulesets/main.json names a check no workflow reports, or stops gating main.
 
-``.github/rulesets/main.json`` records the checks a pull request has to pass before it merges,
-in the form GitHub's "Import a ruleset" takes, so that what gates a merge can be read and diffed
+``.github/rulesets/main.json`` is the ruleset that protects main, as GitHub exports it and in
+the form its "Import a ruleset" takes -- the checks a pull request has to pass before it merges,
+and the rest of what GitHub enforces there -- so that what gates a merge can be read and diffed
 rather than believed. It is also what ``.github/workflows/dependabot-auto-merge.yml`` relies on:
-"gh pr merge --auto" waits for exactly the checks the imported ruleset requires, and for nothing
-at all when it requires none.
+"gh pr merge --auto" waits for exactly the checks the ruleset requires, and for nothing at all
+when it requires none.
 
 GitHub matches a required check by the job's display ``name:`` -- never the workflow's name,
 never the job's key -- so renaming a job without editing this file leaves a context that no run
@@ -24,9 +25,19 @@ What is checked
 * Every ``context`` in the one ``required_status_checks`` rule is the display name of a job in
   ``.github/workflows/*.yml`` -- its ``name:``, or its key when it has none, which is the name
   GitHub reports it under.
-* The file still gates the default branch: one rule and of that type, enforcement ``active``,
-  targeting ``~DEFAULT_BRANCH`` with nothing excluded, and no bypass actor. A re-export made after
-  clicking around the settings page can bring any of those back while the file still parses.
+* The file still gates the default branch: exactly one ``required_status_checks`` rule, with at
+  least one check in it; enforcement ``active``, targeting ``~DEFAULT_BRANCH`` with nothing
+  excluded, and no bypass actor. A re-export made after clicking around the settings page can
+  bring any of those back while the file still parses.
+* No ``pull_request`` rule requires an approval. One required approval would hold every
+  Dependabot update for a person however green its checks are, and "gh pr merge --auto" would
+  wait for that approval as patiently as it waits for the checks.
+
+Any other rule is neither required nor refused. The live ruleset carries more than the checks --
+``deletion``, ``non_fast_forward`` and ``required_linear_history`` among them today -- and
+the file records it whole, so that importing it in place of the live one drops nothing. Refusing
+those rules would stop the file from saying what GitHub enforces; requiring them would turn every
+change to the ruleset into a red build here, for no defect this check exists to catch.
 
 What is deliberately *not* checked
 -----------------------------------
@@ -35,6 +46,14 @@ Whether a required job actually *runs* on a pull request. A job that reports onl
 tags -- the Docker image job here -- passes this check and then never reports on a pull request;
 that is a decision about which jobs belong in the list, and it is made where the list is edited,
 not guessed at here.
+
+Whether the file is what GitHub enforces. The live ruleset is a setting, edited in the settings
+page, and nothing in the tree can see it change; the file differed from it the day both were
+made. Re-export it after editing the ruleset, and read the diff.
+
+Whether the merge method in ``dependabot-auto-merge.yml`` is one the ruleset lets through. That
+is stated beside the ``gh pr merge`` call instead: ``required_linear_history`` refuses a merge
+commit, which is why the call squashes.
 
 The workflows are read with a line scanner rather than a YAML parser, because the standard
 library has none and this runs on the runner's own python3 without installing anything. It only
@@ -114,20 +133,31 @@ def main() -> int:
         )
     if ruleset.get("bypass_actors") != []:
         problems.append(f'"bypass_actors" is {ruleset.get("bypass_actors")!r}, expected none.')
-    rule_types = [rule.get("type") for rule in ruleset.get("rules", [])]
-    if rule_types != ["required_status_checks"]:
+    rules = ruleset.get("rules", [])
+    status_rules = [rule for rule in rules if rule.get("type") == "required_status_checks"]
+    contexts: list[str] = []
+    if len(status_rules) != 1:
         problems.append(
-            f"its rules are {rule_types!r}, expected exactly one required_status_checks."
+            f"it carries {len(status_rules)} required_status_checks rules, expected exactly one."
         )
-        contexts: list[str] = []
     else:
-        parameters = ruleset["rules"][0].get("parameters", {})
+        parameters = status_rules[0].get("parameters", {})
         checks = parameters.get("required_status_checks", [])
         contexts = [check.get("context", "") for check in checks]
         if not contexts:
             problems.append(
                 "it requires no check at all, so auto-merge would merge before CI said anything."
             )
+    approvals = sum(
+        rule.get("parameters", {}).get("required_approving_review_count") or 0
+        for rule in rules
+        if rule.get("type") == "pull_request"
+    )
+    if approvals:
+        problems.append(
+            f"its pull_request rule requires {approvals} approval(s), which would hold every "
+            "Dependabot update for a person however green its checks are."
+        )
 
     reported = reported_names()
     if not reported:
