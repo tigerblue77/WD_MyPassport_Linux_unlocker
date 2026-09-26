@@ -1,0 +1,68 @@
+# Auto-merge Dependabot pull requests for minor and patch updates once the
+# required checks pass. Major updates, and anything red, wait for a human.
+# Adapted from wader/postfix-relay's file of the same name.
+#
+# Requirements, both set by hand, and in this order:
+# - a ruleset on main with required status checks. The one this expects is
+#   committed as .github/rulesets/main.json, in the form GitHub's "Import a
+#   ruleset" takes. Without it "gh pr merge --auto" has nothing to wait for
+#   and merges straight away, before CI has said anything.
+# - "Allow auto-merge" enabled in the repository settings. Without it the
+#   step below fails and the pull request stays open, which is the safe way
+#   round -- and the reason the ruleset comes first.
+#
+# There is deliberately no fallback to a direct "gh pr merge" when --auto is
+# refused: a direct merge lands the update whether or not a single check has
+# run, which is the one outcome this file exists to prevent.
+#
+# Any ecosystem, not only GitHub Actions: what decides is the update type and
+# CI, not a guess about which ecosystem is risky.
+#
+# Required checks are matched by job name, not by workflow name. The names
+# that exist are "Byte-compile the Python scripts" and "Check the ruleset
+# against the workflows" (ci.yml), "Build and publish Docker image to Docker
+# Hub and GitHub Containers Repository" (build_and_publish_docker_image.yml)
+# and "auto-merge", this job, which has no display name. Only the first two
+# are required. The Docker job runs on version tags only, so it never reports
+# on a pull request, and a required check that never reports blocks every
+# pull request. This job reaches no verdict on anything: it is skipped on
+# every pull request Dependabot did not open, and a skipped check counts as
+# a passed one.
+
+name: Dependabot auto-merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    # Backstop. Two API calls, and nothing here should ever sit for GitHub's
+    # default six hours.
+    timeout-minutes: 5
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # --merge : no pull request has been merged here yet to set a
+      # convention, and merge commits are what the settings allow by default
+      # and what wader/postfix-relay, the reference, uses.
+      - name: Enable auto-merge for minor and patch updates
+        if: >-
+          steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        run: gh pr merge --auto --merge "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          # GITHUB_TOKEN is enough. A merge made with it starts no workflow,
+          # so ci.yml does not run again on main afterwards; nothing needs it
+          # to, since the Docker image is published from a version tag, which
+          # a person pushes.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
