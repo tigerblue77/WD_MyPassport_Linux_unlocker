@@ -1,0 +1,68 @@
+# What every pull request is checked against, and what
+# .github/rulesets/main.json requires before one merges -- which is what
+# dependabot-auto-merge.yml waits for before a minor or patch update merges
+# itself. The Docker workflow runs on version tags only, so without this
+# file nothing would report a check on a pull request at all.
+#
+# Kept to what this repository ships and CI can say something about. The two
+# scripts are standard-library Python for whatever python3 the host
+# distribution carries, and they need root and a real WD drive to do
+# anything, so there is nothing to run them against on a runner. What CI can
+# prove is that they still compile.
+#
+# No "paths:" filter, on purpose: a required check has to report on every
+# pull request, and a workflow a filter skipped reports nothing at all, which
+# leaves the pull request waiting on it forever.
+#
+# The job names below are the contexts the ruleset requires. Renaming one
+# means editing .github/rulesets/main.json in the same commit, and the second
+# job is what fails when that is forgotten.
+
+name: CI
+
+on:
+  # Pull requests merge without first being brought up to date with main
+  # (the ruleset leaves that off), so what lands on main can be a combination
+  # no pull request run saw; this checks it. Only for merges a person makes:
+  # one made with GITHUB_TOKEN, as dependabot-auto-merge.yml's are, starts
+  # no workflow.
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    name: Byte-compile the Python scripts
+    runs-on: ubuntu-latest
+    # Backstop: this takes seconds, and nothing here should ever sit for
+    # GitHub's default six hours.
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # The runner's own python3 rather than actions/setup-python: the
+      # scripts promise no particular Python, only the distribution's, and
+      # one action fewer is one thing fewer to break and to keep updated.
+      #
+      # -W error turns a SyntaxWarning, such as an invalid escape sequence in
+      # a string, into the SyntaxError Python has announced it will become;
+      # without it py_compile prints the warning and exits 0. The glob picks
+      # up a script added next to these two, and fails loudly rather than
+      # checking nothing if there is none.
+      - name: Byte-compile every script at the repository root
+        run: python3 -W error -m py_compile ./*.py
+
+  ruleset:
+    name: Check the ruleset against the workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check every required check names a job that reports it
+        run: python3 .github/scripts/check_required_checks.py

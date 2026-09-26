@@ -1,12 +1,51 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for more information:
-# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+# Dependabot version updates. Please see the documentation for more
+# information:
+# https://docs.github.com/code-security/reference/supply-chain-security/dependabot-options-reference
 # https://containers.dev/guide/dependabot
+#
+# One entry per ecosystem this repository actually has. The two scripts use
+# the Python standard library only, so there is no pip manifest, and there is
+# no Dockerfile, so no docker entry either.
+#
+# Minor and patch updates are grouped into one pull request per entry, which
+# .github/workflows/dependabot-auto-merge.yml merges once the checks
+# .github/rulesets/main.json requires are green. Majors stay out of the
+# groups: one pull request each, waiting for a human.
+#
+# open-pull-requests-limit is 99 on every entry. The default is 5, and once
+# five pull requests are waiting Dependabot silently stops opening more; 0
+# does not lift the cap, it disables version updates altogether.
 
 version: 2
 updates:
- - package-ecosystem: "devcontainers"
-   directory: "/"
-   schedule:
-     interval: weekly
+  # Only updates the "features" pinned in .devcontainer/devcontainer.json,
+  # and it declares none today, so this entry has opened no pull request yet.
+  # It is here so that adding a feature is covered without anyone having to
+  # remember this file.
+  - package-ecosystem: "devcontainers"
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 99
+    groups:
+      devcontainers-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Every action in .github/workflows/ is referenced by a floating major tag
+  # (actions/checkout@v7), and Dependabot keeps that precision, so what it
+  # proposes here is the next major, which waits for a human. The group only
+  # fills up for an action pinned to a full version.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 99
+    groups:
+      github-actions-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
