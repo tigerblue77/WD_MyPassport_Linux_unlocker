@@ -42,10 +42,10 @@ change to the ruleset into a red build here, for no defect this check exists to 
 What is deliberately *not* checked
 -----------------------------------
 
-Whether a required job actually *runs* on a pull request. A job that reports only on version
-tags -- the Docker image job here -- passes this check and then never reports on a pull request;
-that is a decision about which jobs belong in the list, and it is made where the list is edited,
-not guessed at here.
+Whether a required job actually *runs* on a pull request. A job that never runs on one -- the
+branch updater here, which runs on main -- passes this check and then never reports on a pull
+request; that is a decision about which jobs belong in the list, and it is made where the list is
+edited, not guessed at here.
 
 Whether the file is what GitHub enforces. The live ruleset is a setting, edited in the settings
 page, and nothing in the tree can see it change; the file differed from it the day both were

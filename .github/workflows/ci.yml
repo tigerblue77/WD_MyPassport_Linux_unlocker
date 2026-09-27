@@ -1,8 +1,8 @@
 # What every pull request is checked against, and what
 # .github/rulesets/main.json requires before one merges -- which is what
 # dependabot-auto-merge.yml waits for before a minor or patch update merges
-# itself. The Docker workflow runs on version tags only, so without this
-# file nothing would report a check on a pull request at all.
+# itself. It is the only workflow that reports a check on every pull
+# request, so without it nothing would.
 #
 # Kept to what this repository ships and CI can say something about. The two
 # scripts are standard-library Python for whatever python3 the host
