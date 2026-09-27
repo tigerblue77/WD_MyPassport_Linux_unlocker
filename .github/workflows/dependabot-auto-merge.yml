@@ -23,13 +23,15 @@
 # Required checks are matched by job name, not by workflow name. The names
 # that exist are "Byte-compile the Python scripts" and "Check the ruleset
 # against the workflows" (ci.yml), "Build and publish Docker image to Docker
-# Hub and GitHub Containers Repository" (build_and_publish_docker_image.yml)
-# and "auto-merge", this job, which has no display name. Only the first two
-# are required. The Docker job runs on version tags only, so it never reports
-# on a pull request, and a required check that never reports blocks every
-# pull request. This job reaches no verdict on anything: it is skipped on
-# every pull request Dependabot did not open, and a skipped check counts as
-# a passed one.
+# Hub and GitHub Containers Repository" (build_and_publish_docker_image.yml),
+# "Update the pull requests main left behind"
+# (auto_update_pull_request_branches.yml) and "auto-merge", this job, which
+# has no display name. Only the first two are required. The Docker job runs
+# on version tags only and the branch updater on main, on a schedule and by
+# hand, so neither ever reports on a pull request, and a required check that
+# never reports blocks every pull request. This job reaches no verdict on
+# anything: it is skipped on every pull request Dependabot did not open, and
+# a skipped check counts as a passed one.
 
 name: Dependabot auto-merge
 
@@ -71,5 +73,7 @@ jobs:
           # GITHUB_TOKEN is enough. A merge made with it starts no workflow,
           # so ci.yml does not run again on main afterwards; nothing needs it
           # to, since the Docker image is published from a version tag, which
-          # a person pushes.
+          # a person pushes, and auto_update_pull_request_branches.yml
+          # reaches the pull requests such a merge leaves behind on its
+          # hourly schedule rather than on the push.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
