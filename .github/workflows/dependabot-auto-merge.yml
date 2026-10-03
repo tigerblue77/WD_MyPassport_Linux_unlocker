@@ -25,7 +25,7 @@
 # against the workflows" (ci.yml), "Update the pull requests main left
 # behind" (auto_update_pull_request_branches.yml) and "auto-merge", this
 # job, which has no display name. Only the first two are required. The
-# branch updater runs on main, on a schedule and by hand, so it never
+# branch updater runs on pushes to main and by hand, so it never
 # reports on a pull request, and a required check that never reports blocks
 # every pull request. This job reaches no verdict on
 # anything: it is skipped on every pull request Dependabot did not open, and
@@ -70,8 +70,9 @@ jobs:
           PR_URL: ${{ github.event.pull_request.html_url }}
           # GITHUB_TOKEN is enough. A merge made with it starts no workflow,
           # so ci.yml does not run again on main afterwards; nothing needs it
-          # to, since nothing is built or published from main, and
-          # auto_update_pull_request_branches.yml reaches the pull requests
-          # such a merge leaves behind on its hourly schedule rather than on
-          # the push.
+          # to, since nothing is built or published from main. For the same
+          # reason auto_update_pull_request_branches.yml does not wait for such
+          # a merge: it brings the pull requests the merge leaves behind level
+          # after the next push to main made any other way, or when it is run
+          # by hand, and nothing blocks them meanwhile.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
