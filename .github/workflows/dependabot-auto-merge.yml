@@ -55,12 +55,9 @@ jobs:
 
       # --squash, because the ruleset on main requires a linear history, and
       # a merge commit is exactly what that rule refuses: --merge could never
-      # land an update, and every one would stay open. It is also what the
-      # maintainer's other repositories do under the same rule
-      # (Dell_iDRAC_fan_controller_Docker, Claude-Code-Docker-container), so
-      # every one of them lands Dependabot's updates the same way. --rebase
-      # would satisfy the rule as well, and make this the one repository that
-      # does it differently.
+      # land an update, and every one would stay open. --rebase would satisfy
+      # the rule as well; --squash is the one that always lands an update as
+      # a single commit, and nothing here asks for anything else.
       - name: Enable auto-merge for minor and patch updates
         if: >-
           steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
